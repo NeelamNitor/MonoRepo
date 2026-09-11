@@ -1,0 +1,178 @@
+openapi: 3.0.3
+info:
+  title: Product Service API
+  version: "1.0"
+  description: >
+    Catalog management API (spec User Story 1 & 4; FR-001, FR-002, FR-010, FR-011).
+    Backs the Vue.js `product-app`. CQRS: POST/PUT/PATCH map to Commands, GET maps to Queries.
+servers:
+  - url: https://api.example.com/product-service/v1
+paths:
+  /products:
+    get:
+      summary: Search products (Query)
+      operationId: searchProducts
+      parameters:
+        - name: q
+          in: query
+          description: Free-text match against name/SKU (FR-010)
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [Active, Retired] }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: Matching products
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Product" }
+                  totalCount: { type: integer }
+    post:
+      summary: Create a product (Command — CreateProductCommand)
+      operationId: createProduct
+      security: [ { bearerAuth: [ "catalog-manager" ] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateProductRequest" }
+      responses:
+        "201":
+          description: Product created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "400":
+          description: Validation failure (e.g., negative price/stock — FR-011)
+  /products/{productId}:
+    get:
+      summary: Get a product by id (Query)
+      operationId: getProductById
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: Product found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "404": { description: Not found }
+    patch:
+      summary: Update a product's price/description/stock (Command — UpdateProductCommand)
+      operationId: updateProduct
+      security: [ { bearerAuth: [ "catalog-manager" ] } ]
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateProductRequest" }
+      responses:
+        "200":
+          description: Updated product
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "400": { description: Validation failure }
+        "404": { description: Not found }
+  /products/{productId}/retire:
+    post:
+      summary: Retire a product (Command — RetireProductCommand)
+      operationId: retireProduct
+      security: [ { bearerAuth: [ "catalog-manager" ] } ]
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: Product retired
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "404": { description: Not found }
+  /products/{productId}/reserve-stock:
+    post:
+      summary: >
+        Reserve (atomically decrement) stock for an order line item.
+        Called synchronously by Order Service at order placement (FR-005); also triggerable via the
+        StockReservationRequested event per contracts/events.md — see architecture.md §3.4.
+      operationId: reserveStock
+      security: [ { bearerAuth: [ "service" ] } ]
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity, orderId]
+              properties:
+                quantity: { type: integer, minimum: 1 }
+                orderId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Stock reserved; current price/name returned for the order-line snapshot (FR-004)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  productId: { type: string, format: uuid }
+                  nameSnapshot: { type: string }
+                  unitPriceSnapshot: { type: number, format: decimal }
+                  reservedQuantity: { type: integer }
+        "409":
+          description: Insufficient stock — request rejected, no stock decremented (spec Edge Case)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    Product:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string }
+        name: { type: string }
+        description: { type: string }
+        price: { type: number, format: decimal, minimum: 0 }
+        stockQuantity: { type: integer, minimum: 0 }
+        status: { type: string, enum: [Active, Retired] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CreateProductRequest:
+      type: object
+      required: [sku, name, price, stockQuantity]
+      properties:
+        sku: { type: string }
+        name: { type: string }
+        description: { type: string }
+        price: { type: number, format: decimal, minimum: 0 }
+        stockQuantity: { type: integer, minimum: 0 }
+    UpdateProductRequest:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        price: { type: number, format: decimal, minimum: 0 }
+        stockQuantity: { type: integer, minimum: 0 }

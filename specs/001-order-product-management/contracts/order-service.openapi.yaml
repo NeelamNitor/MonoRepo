@@ -1,0 +1,165 @@
+openapi: 3.0.3
+info:
+  title: Order Service API
+  version: "1.0"
+  description: >
+    Order placement and lifecycle API (spec User Story 2 & 3; FR-003, FR-004, FR-006, FR-007, FR-008, FR-010).
+    Backs the Angular `order-app`. CQRS: POST/PATCH map to Commands, GET maps to Queries.
+servers:
+  - url: https://api.example.com/order-service/v1
+paths:
+  /orders:
+    get:
+      summary: Search/list orders (Query — SearchOrdersQuery)
+      operationId: searchOrders
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/OrderStatus" }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: Matching orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/OrderSummary" }
+                  totalCount: { type: integer }
+    post:
+      summary: Place an order (Command — PlaceOrderCommand)
+      operationId: placeOrder
+      security: [ { bearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlaceOrderRequest" }
+      responses:
+        "201":
+          description: Order placed (status Placed)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "400":
+          description: Validation failure (e.g., zero line items — FR-011)
+        "409":
+          description: Insufficient stock for one or more line items (spec Edge Case)
+  /orders/{orderId}:
+    get:
+      summary: Get order detail (Query — GetOrderByIdQuery)
+      operationId: getOrderById
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Order found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "404": { description: Not found }
+  /orders/{orderId}/status:
+    patch:
+      summary: Advance or cancel an order's status (Command — ChangeOrderStatusCommand)
+      operationId: changeOrderStatus
+      security: [ { bearerAuth: [ "operations" ] } ]
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newStatus]
+              properties:
+                newStatus: { $ref: "#/components/schemas/OrderStatus" }
+      responses:
+        "200":
+          description: Status updated; OrderStatusChanged event published (FR-009)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "409":
+          description: >
+            Invalid transition for current status (FR-006) — e.g., attempting to change
+            a Delivered or Cancelled order.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    OrderStatus:
+      type: string
+      enum: [Placed, Confirmed, Shipped, Delivered, Cancelled]
+    PlaceOrderRequest:
+      type: object
+      required: [lineItems]
+      properties:
+        lineItems:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [productId, quantity]
+            properties:
+              productId: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+    OrderLineItem:
+      type: object
+      properties:
+        productId: { type: string, format: uuid }
+        productNameSnapshot: { type: string }
+        unitPriceSnapshot: { type: number, format: decimal }
+        quantity: { type: integer }
+        lineTotal: { type: number, format: decimal }
+    Order:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        totalAmount: { type: number, format: decimal }
+        lineItems:
+          type: array
+          items: { $ref: "#/components/schemas/OrderLineItem" }
+        statusHistory:
+          type: array
+          items:
+            type: object
+            properties:
+              previousStatus: { $ref: "#/components/schemas/OrderStatus" }
+              newStatus: { $ref: "#/components/schemas/OrderStatus" }
+              changedAt: { type: string, format: date-time }
+              changedBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OrderSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        totalAmount: { type: number, format: decimal }
+        createdAt: { type: string, format: date-time }

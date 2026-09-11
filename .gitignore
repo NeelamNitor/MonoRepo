@@ -1,0 +1,24 @@
+# .NET build output (backend/, tests/)
+bin/
+obj/
+*.user
+
+# .NET EF Core / tooling
+*.dbmk
+
+# Logs
+*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vs/
+.idea/
+*.suo
+
+# Local environment overrides (never commit real secrets/connection strings here)
+**/appsettings.*.local.json
+.env
+.env.local

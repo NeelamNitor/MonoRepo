@@ -1,0 +1,14 @@
+<div class="app-shell">
+  <nav class="app-shell__nav">
+    <a routerLink="/orders" class="app-shell__brand">Order Management</a>
+    <a routerLink="/orders/new" class="btn btn--primary">+ New Order</a>
+    <div class="app-shell__role-switch">
+      <span>Signed in as: <strong>{{ auth.user().userId }}</strong> ({{ auth.isOperations() ? 'operations' : 'buyer' }})</span>
+      <button class="btn btn--sm" style="color: black;" (click)="switchRole('operations')">Act as operations</button>
+      <button class="btn btn--sm" style="color: black;" (click)="switchRole('buyer')">Act as buyer</button>
+    </div>
+  </nav>
+  <main class="app-shell__content">
+    <router-outlet />
+  </main>
+</div>

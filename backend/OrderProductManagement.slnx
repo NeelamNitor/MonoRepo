@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/services/" />
+  <Folder Name="/services/OrderService/">
+    <Project Path="services/OrderService/OrderService.Api/OrderService.Api.csproj" />
+    <Project Path="services/OrderService/OrderService.Application/OrderService.Application.csproj" />
+    <Project Path="services/OrderService/OrderService.Domain/OrderService.Domain.csproj" />
+    <Project Path="services/OrderService/OrderService.Infrastructure/OrderService.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/services/ProductService/">
+    <Project Path="services/ProductService/ProductService.Api/ProductService.Api.csproj" />
+    <Project Path="services/ProductService/ProductService.Application/ProductService.Application.csproj" />
+    <Project Path="services/ProductService/ProductService.Domain/ProductService.Domain.csproj" />
+    <Project Path="services/ProductService/ProductService.Infrastructure/ProductService.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/shared/">
+    <Project Path="shared/Contracts/Contracts.csproj" />
+  </Folder>
+  <Project Path="../tests/OrderService.Tests/OrderService.Tests.csproj" />
+  <Project Path="../tests/ProductService.Tests/ProductService.Tests.csproj" />
+</Solution>
